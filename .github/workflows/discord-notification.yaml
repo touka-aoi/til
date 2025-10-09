@@ -6,14 +6,44 @@ on:
   workflow_dispatch:
 
 jobs:
+  file-link:
+    runs-on: ubuntu-latest
+    outputs:
+      file_url: ${{ steps.changed-files.outputs.file_url }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Get Changed Files
+        id: changed-files
+        run: |
+          set -euo pipefail
+          file=$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" | head -n1)
+          if [[ -z "${file}" ]]; then
+            echo "No added file in this push" >&2
+            exit 1
+          fi
+
+          url="${{ github.server_url }}/${{ github.repository }}/blob/${{ github.sha }}/${file}"
+
+          echo "file_url=${url}" >> "$GITHUB_OUTPUT"
   notify-discord:
+    needs: file-link
     runs-on: ubuntu-latest
     env:
       DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
     steps:
       - name: Send Discord Notification
+        env:
+          FILE_URL: ${{ needs.file-link.outputs.file_url }}
         run: |
-          curl -H "Content-Type: application/json" \
-              -X POST \
-              -d '{"content": "The main branch has been updated!"}' \
-              $DISCORD_WEBHOOK_URL
+          set -euo pipefail
+          if [[ -z "$FILE_URL" ]]; then
+            echo "No added file in this push" >&2
+            exit 0
+          fi
+
+          curl -sS -H "Content-Type: application/json" \
+            -d "{\"content\": \"$FILE_URL\"}" \
+            "$DISCORD_WEBHOOK_URL"
