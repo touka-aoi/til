@@ -45,5 +45,5 @@ jobs:
           fi
 
           curl -sS -H "Content-Type: application/json" \
-            -d "{\"content\": \"$FILE_URL\"}" \
+            -d "{\"content\": \"<$FILE_URL>\"}" \
             "$DISCORD_WEBHOOK_URL"
